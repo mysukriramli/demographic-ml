@@ -7,7 +7,7 @@ import umap
 from st_keyup import st_keyup
 
 # Set page layout to wide for dashboard split look
-st.set_page_config(layout="wide", page_title="MyKad Controlled UMAP Engine")
+st.set_page_config(layout="wide", page_title="MyKad Automated UMAP Engine")
 
 # Inject Custom CSS to style the input box and make the fill-in-the-blank mask giant
 st.markdown("""
@@ -114,12 +114,10 @@ with col1:
     disp_pb = pb_part + "_" * (2 - len(pb_part)) if len(yy_part) == 2 else "__"
     disp_g = g_part if len(clean_digits) == 5 else "_"
     
-    # Renders the precise fill-in-the-blank text mask format on screen
     current_mask_view = f"{disp_yy}####-{disp_pb}-###{disp_g}"
     st.markdown(f"<div class='giant-mask'>{current_mask_view}</div>", unsafe_allow_html=True)
     
-    # --- THE SEND CONTROL BUTTON ---
-    # Prevents incomplete data from polluting the database grid prematurely
+    # Send Control Button
     send_button = st.button("🚀 Send Profile to Matrix", type="primary", use_container_width=True)
     
     if send_button:
@@ -132,7 +130,7 @@ with col1:
     if len(clean_digits) > 0 and len(clean_digits) < 5:
         st.info(f"Typing progress: {len(clean_digits)} / 5 digits tracked.")
 
-# --- COLUMN 2: LIVE UMAP CLASSIFIER PLATFORM ---
+# --- COLUMN 2: LIVE UMAP CLASSIFIER & AUTOMATED COMMENTARY ---
 with col2:
     st.header("🖥️ Live UMAP Projection Center")
     
@@ -157,11 +155,9 @@ with col2:
         # Safe fallback method dictionary extraction to prevent any KeyError
         df["Birth State"] = df["PB"].apply(lambda x: pb_map.get(str(x), "International / Other"))
         df["Assigned Gender"] = df["G_int"].apply(lambda x: "Female" if x % 2 == 0 else "Male")
-        
         df["Anonymized Label"] = df.index.map(lambda x: f"Identity_{x+1:02d}")
         
         processing_matrix = df[["Age", "PB_int", "G_int"]]
-        
         scaler = StandardScaler()
         scaled_matrix = scaler.fit_transform(processing_matrix)
         
@@ -194,11 +190,41 @@ with col2:
         except Exception as e:
             st.info("Gathering structural point variations... Submit a few more distinct entries to settle spatial vectors.")
             
+        # --- NEW SECTION: AUTOMATED DEMOGRAPHIC COMMENTARY REPORT ---
+        st.markdown("---")
+        st.subheader("🤖 Automated Demographic Intelligence Report")
+        
+        # 1. Geographic Concentration Commentary
+        top_state = df["Birth State"].mode()[0]
+        state_counts = df["Birth State"].value_value_counts = df["Birth State"].value_counts()
+        top_state_pct = (state_counts.iloc[0] / total_records) * 100
+        
+        # 2. Generational Commentary (Relative to 2026)
+        gen_z_count = len(df[(df["Birth Year"] >= 1997) & (df["Birth Year"] <= 2009)])
+        gen_alpha_count = len(df[df["Birth Year"] >= 2010])
+        millennial_count = len(df[(df["Birth Year"] >= 1981) & (df["Birth Year"] <= 1996)])
+        
+        # 3. Gender Matrix Commentary
+        male_count = len(df[df["Assigned Gender"] == "Male"])
+        female_count = len(df[df["Assigned Gender"] == "Female"])
+        
+        # Render dynamic analytical summary cards based on incoming matrix trends
+        st.markdown(f"""
+        ### 📊 Spatial Clustering Analysis:
+        * **Geographic Hotspot:** The most heavily represented region in the current dataset is **{top_state}**, which accounts for **{top_state_pct:.1f}%** of all entries. On the UMAP chart, this forms a dense coordinate cluster due to shared geographic code values.
+        * **Generational Variance:** In our active 2026 data stream, the class matrix is structurally divided into **{gen_alpha_count}** Gen Alpha profiles, **{gen_z_count}** Gen Z profiles, and **{millennial_count}** Millennial profiles. UMAP utilizes these age vectors to spread data points smoothly along the age axis.
+        * **Gender Matrix Ratios:** The current room balance stands at **{male_count} Male entries** vs. **{female_count} Female entries**. When toggling the color map to 'Assigned Gender', you will notice a distinct, clean mathematical bisection on the chart because the final odd/even digits create a highly polarized spatial separation.
+        """)
+        
+        if total_records >= 10:
+            st.success("💡 **Data Science Insight:** With over 10 profiles mapped, notice how UMAP's non-linear manifold math automatically groups people who share the exact same state and gender close together, while cleanly separating different age generations into distinct bands!")
+            
+        # Summary log output table
         st.subheader("📋 Current Registry Overview")
         st.dataframe(df[["Anonymized Label", "Birth Year", "Birth State", "Assigned Gender"]], use_container_width=True)
         
     else:
-        st.info("Awaiting cluster density validation. Please submit at least **4 unique records** from student phones to activate the UMAP neural pipeline.")
+        st.info("Awaiting cluster density validation. Please submit at least **4 unique records** from student phones to activate the UMAP neural pipeline and trigger auto-commentary.")
 
 # --- SECURE CAMOUFLAGED CLEANSE SYSTEM ---
 st.markdown("<br><br><br><br><br>", unsafe_allow_html=True)
