@@ -5,16 +5,30 @@ import plotly.express as px
 from sklearn.preprocessing import StandardScaler
 import umap
 
-# Set page layout to wide for side-by-side dashboard look
-st.set_page_config(layout="wide", page_title="MyKad UMAP Classifier")
+# Set page layout to wide for dashboard split look
+st.set_page_config(layout="wide", page_title="MyKad UMAP Engine")
 
-st.title("🧬 Live MyKad Demographics Classifier using UMAP")
+# Inject Custom CSS to make the continuous input field giant and easy to read
 st.markdown("""
-    **Classroom Context:** Students submit a 5-digit continuous MyKad shorthand code. 
-    The AI pipeline on the right standardizes their demographic features and applies **UMAP** to visually project and classify the entire room in real time!
+    <style>
+        div[data-baseweb="input"] input {
+            font-size: 36px !important;
+            height: 70px !important;
+            text-align: center !important;
+            font-family: 'Courier New', monospace !important;
+            font-weight: bold !important;
+            color: #1E3A8A !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+st.title("🚨 Live Identity Demographics Classifier using UMAP")
+st.markdown("""
+    **Classroom Context:** Students type their 12 digits continuously into the giant field below. 
+    The AI pipeline strips spaces or dashes, processes their data completely anonymously, and plots them on a live UMAP cluster map!
 """)
 
-# --- Place of Birth (PB) Code Dictionary Mapping ---
+# --- Place of Birth (PB) Mapping Base ---
 pb_map = {
     "01": "Johor", "21": "Johor", "22": "Johor", "23": "Johor", "24": "Johor",
     "02": "Kedah", "25": "Kedah", "26": "Kedah", "27": "Kedah",
@@ -33,136 +47,149 @@ pb_map = {
     "15": "Labuan", "58": "Labuan", "16": "Putrajaya"
 }
 
-# --- GLOBAL SHARED DATABASE MANAGER ---
-class DemographicDataManager:
+# --- GLOBAL SHARED DATABASE MANAGER (Starts completely empty) ---
+class CloudRegistryManager:
     def __init__(self):
-        # Pre-populate with diverse dummy data so UMAP has background clusters immediately
-        np.random.seed(42)
-        dummy_traders = [f"Agent_{i:02d}" for i in range(1, 31)]
-        dummy_years = np.random.choice(["88", "95", "99", "01", "05", "15"], size=30)
-        dummy_pbs = np.random.choice(["01", "02", "03", "08", "10", "14"], size=30)
-        dummy_gs = np.random.choice(["1", "2", "3", "4"], size=30)
-        
-        records = []
-        for t, y, p, g in zip(dummy_traders, dummy_years, dummy_pbs, dummy_gs):
-            records.append({"Alias": t, "YY": y, "PB": p, "G": g})
-            
-        self.df = pd.DataFrame(records)
+        self.df = pd.DataFrame(columns=["Raw_ID", "YY", "MM", "DD", "PB", "Serial", "G"])
     
-    def add_profile(self, row):
-        self.df = pd.concat([self.df, pd.DataFrame([row])], ignore_index=True)
-        
-    def reset_database(self):
-        self.df = pd.DataFrame(columns=["Alias", "YY", "PB", "G"])
+    def add_entry(self, row):
+        # Prevent exact duplicate string entries from double-triggering
+        if not ((self.df["Raw_ID"] == row["Raw_ID"])).any():
+            self.df = pd.concat([self.df, pd.DataFrame([row])], ignore_index=True)
+            
+    def wipe_all(self):
+        self.df = pd.DataFrame(columns=["Raw_ID", "YY", "MM", "DD", "PB", "Serial", "G"])
 
 @st.cache_resource
-def get_demographic_database():
-    return DemographicDataManager()
+def get_cloud_registry():
+    return CloudRegistryManager()
 
-db = get_demographic_database()
+db = get_cloud_registry()
 
-# Layout Split: 1/3 Submission Input, 2/3 Live UMAP Charts
+# Layout Split: 1/3 Big Entry Column, 2/3 Live Visual Dashboard
 col1, col2 = st.columns([1, 2])
 
-# --- COLUMN 1: CONTINUOUS SHORTHAND INPUT FORM ---
+# --- COLUMN 1: ENTRY PORTAL & TARGET QR CODE ---
 with col1:
-    st.header("📥 Continuous Data Stream")
+    st.header("📥 Continuous Input Portal")
     
-    # Simple instructions for seamless continuous entry
-    st.markdown("💡 *Type your 5 digits continuously below without lifting your finger.*")
+    st.markdown("### 📲 Scan to Join Live")
+    # Updated to your unique project target link
+    app_url = "https://demographic-ml-37tvhybmcrlgumshlapppp4o.streamlit.app/"
+    qr_api_url = f"https://api.qrserver.com/v1/create-qr-code/?size=180x180&data={app_url}"
+    st.image(qr_api_url, caption="Scan with your phone to type live", width=180)
+    st.markdown("---")
     
-    user_name = st.text_input("Enter your Shorthand Alias:", placeholder="e.g., Participant X", key="alias_input")
-    user_code = st.text_input("Enter 5 Digits Continuously (YYPBG):", max_chars=5, placeholder="e.g., 99101", key="code_input")
+    st.markdown("##### Type your 12 digits cleanly below:")
     
-    if len(user_code) == 5 and user_code.isdigit():
-        if user_name.strip() == "":
-            st.error("Please provide an Alias name above your continuous code entry!")
-        else:
-            # Check if this precise entry was already added to prevent infinite re-run loops
-            is_duplicate = ((db.df["Alias"] == user_name) & (db.df["YY"] == user_code[0:2])).any()
-            if not is_duplicate:
-                new_profile = {
-                    "Alias": user_name,
-                    "YY": user_code[0:2],
-                    "PB": user_code[2:4],
-                    "G": user_code[4]
-                }
-                db.add_profile(new_profile)
-                st.success(f"⚡ Live Profile compiled successfully for {user_name}!")
-    elif len(user_code) > 0 and not user_code.isdigit():
-        st.error("Invalid character vector detected. Numerical parameters only.")
+    # Single large text box with the precise layout request
+    user_string = st.text_input(
+        label="Format standard: YYMMDD-PB-###G",
+        value="",
+        max_chars=14,
+        placeholder="YYMMDD-PB-###G"
+    )
+    
+    # Process string smoothly by removing potential accidental user dashes/spaces live
+    clean_digits = user_string.replace("-", "").replace(" ", "").strip()
+    
+    if len(clean_digits) == 12 and clean_digits.isdigit():
+        # Map sub-segments seamlessly
+        new_row_data = {
+            "Raw_ID": clean_digits,
+            "YY": clean_digits[0:2],
+            "MM": clean_digits[2:4],
+            "DD": clean_digits[4:6],
+            "PB": clean_digits[6:8],
+            "Serial": clean_digits[8:11],
+            "G": clean_digits[11]
+        }
+        db.add_entry(new_row_data)
+        st.success("🎯 Identity pattern submitted seamlessly!")
+    elif len(clean_digits) > 0 and len(clean_digits) < 12:
+        st.warning(f"Processing character string... Count: {len(clean_digits)}/12 digits")
 
-# --- COLUMN 2: REAL-TIME CLASSIFICATION & UMAP PLOT ---
+# --- COLUMN 2: LIVE UMAP CLASSIFIER PLATFORM ---
 with col2:
-    st.header("🖥️ Live UMAP Analytics Engine")
+    st.header("🖥️ Live UMAP Projection Center")
     
-    if st.button("🔄 Sync Class Matrix", type="primary", use_container_width=True):
+    if st.button("🔄 Sync Classroom Network Matrix", type="primary", use_container_width=True):
         st.rerun()
         
     df = db.df.copy()
+    total_records = len(df)
     
-    if len(df) >= 5:
-        # --- FEATURE ENGINEERING PIPELINE ---
-        # 1. Resolve true birth year & age (Current year: 2026)
+    st.metric(label="Total Anonymous Profiles Submitted", value=total_records)
+    
+    # Check if dataset has enough observations to calculate mathematical dimensions safely
+    if total_records >= 4:
+        # --- ANONYMOUS FEATURE ENGINEERING ---
         df["YY_int"] = df["YY"].astype(int)
+        df["MM_int"] = df["MM"].astype(int)
+        df["DD_int"] = df["DD"].astype(int)
+        df["PB_int"] = df["PB"].astype(int)
+        df["G_int"] = df["G"].astype(int)
+        
+        # Calculate true age parameters based on current year 2026 boundary conditions
         df["Birth Year"] = df["YY_int"].apply(lambda x: 2000 + x if x <= 26 else 1900 + x)
         df["Age"] = 2026 - df["Birth Year"]
         
-        # 2. Parse State Names and Categorical variables
-        df["State Group"] = df["PB"].map(pb_map).fillna("Other / Unknown")
-        df["Gender Group"] = df["G"].astype(int).apply(lambda x: "Female" if x % 2 == 0 else "Male")
+        # Human readable grouping categories
+        df["Birth State"] = df["PB"].map(pb_map).fillna("International / Other")
+        df["Assigned Gender"] = df["G_int"].apply(lambda x: "Female" if x % 2 == 0 else "Male")
         
-        # 3. Formulate pure numeric metrics array for UMAP mathematical computation
-        df["PB_Numeric"] = df["PB"].astype(int)
-        df["G_Numeric"] = df["G"].astype(int)
+        # Mask specific identifiers to protect privacy on public classroom display
+        df["Anonymized Label"] = df.index.map(lambda x: f"Identity_{x+1:02d}")
+        df["Masked Profile"] = df["Birth Year"].astype(str) + " | " + df["Birth State"] + " | " + df["Assigned Gender"]
         
-        umap_features = df[["Age", "PB_Numeric", "G_Numeric"]]
+        # 3D Metric array to process dimensional reduction math
+        processing_matrix = df[["Age", "MM_int", "DD_int", "PB_int", "G_int"]]
         
-        # Scale feature space inputs equally
         scaler = StandardScaler()
-        scaled_features = scaler.fit_transform(umap_features)
+        scaled_matrix = scaler.fit_transform(processing_matrix)
         
-        # Run UMAP Dimensionality Reduction
-        # Adaptive adjustment of neighbors based on the database size
-        n_neighbors = min(15, len(df) - 1)
-        if n_neighbors < 2:
-            n_neighbors = 2
+        # Dynamic neighbors adjustments based on collected volume
+        neighbors_calc = min(15, total_records - 1)
+        if neighbors_calc < 2: 
+            neighbors_calc = 2
             
         try:
-            reducer = umap.UMAP(n_neighbors=n_neighbors, min_dist=0.1, random_state=42)
-            embedding = reducer.fit_transform(scaled_features)
+            # Execute UMAP Embedding calculations
+            reducer = umap.UMAP(n_neighbors=neighbors_calc, min_dist=0.1, random_state=42)
+            embedding = reducer.fit_transform(scaled_matrix)
             
-            df["UMAP Dim 1"] = embedding[:, 0]
-            df["UMAP Dim 2"] = embedding[:, 1]
+            df["UMAP Axis 1"] = embedding[:, 0]
+            df["UMAP Axis 2"] = embedding[:, 1]
             
-            # --- RENDER INTERACTIVE PLOTLY SCATTER CHART ---
-            color_option = st.radio("Color Map Classification Field:", ["State Group", "Gender Group", "Birth Year"], horizontal=True)
+            # Interactive Categorization Selector
+            classification_target = st.radio("Classify Topology Coordinates By:", ["Birth State", "Assigned Gender", "Birth Year"], horizontal=True)
             
             fig = px.scatter(
-                df, 
-                x="UMAP Dim 1", 
-                y="UMAP Dim 2", 
-                color=color_option,
-                hover_name="Alias",
-                hover_data=["Age", "State Group", "Gender Group"],
-                title=f"2D UMAP Spatial Embedding Topology (Grouped by {color_option})",
+                df,
+                x="UMAP Axis 1",
+                y="UMAP Axis 2",
+                color=classification_target,
+                hover_name="Anonymized Label",
+                hover_data=["Age", "Birth State", "Assigned Gender"],
+                title=f"Live UMAP Projection Map (Clustered by {classification_target})",
                 template="plotly_white"
             )
-            fig.update_traces(marker=dict(size=12, opacity=0.8, line=dict(width=1, color="DarkSlateGrey")))
+            fig.update_traces(marker=dict(size=14, opacity=0.8, line=dict(width=1, color="DarkSlateGrey")))
             st.plotly_chart(fig, use_container_width=True)
             
-        except Exception as e:
-            st.warning("UMAP mathematical optimization loop is converging. Submit more distinct entries.")
+        except Exception as error_log:
+            st.info("Gathering diverse geometric point distributions... Type in a few more distinct entries to settle spatial vectors.")
             
-        # Display underlying registry log metrics
-        st.subheader("📋 Registry Profile Metrics Logs")
-        st.dataframe(df[["Alias", "Age", "State Group", "Gender Group"]], use_container_width=True)
+        # Summary log output
+        st.subheader("📋 Current Registry Overview")
+        st.dataframe(df[["Anonymized Label", "Birth Year", "Birth State", "Assigned Gender"]], use_container_width=True)
+        
     else:
-        st.info("Awaiting cluster density parameters. Please feed more values into the data stream.")
+        st.info("Awaiting cluster density validation. Please submit at least **4 unique records** from student phones to activate the UMAP neural pipeline.")
 
-# --- CAMOUFLAGED TEACHER RESET KEY ---
+# --- SECURE CAMOUFLAGED CLEANSE SYSTEM ---
 st.markdown("<br><br><br><br><br>", unsafe_allow_html=True)
 with st.expander("·", expanded=False):
-    if st.button("🗑️ Wipe Model Cache (Clear All Class Entries)"):
-        db.reset_database()
+    if st.button("🗑️ Clear Live Database Cache"):
+        db.wipe_all()
         st.rerun()
