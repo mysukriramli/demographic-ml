@@ -2,14 +2,15 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
+import plotly.graph_objects as go
 from sklearn.preprocessing import StandardScaler
 import umap
 from st_keyup import st_keyup
 
 # Set page layout to wide for dashboard split look
-st.set_page_config(layout="wide", page_title="MyKad Controlled UMAP Engine")
+st.set_page_config(layout="wide", page_title="MyKad Masked UMAP Engine")
 
-# Inject Custom CSS to style the input box and make the fill-in-the-blank mask giant
+# Inject Custom CSS to style input elements and the giant fill-in-the-blank mask
 st.markdown("""
     <style>
         div[data-baseweb="input"] input {
@@ -119,7 +120,6 @@ with col1:
     st.markdown(f"<div class='giant-mask'>{current_mask_view}</div>", unsafe_allow_html=True)
     
     # --- THE SEND CONTROL BUTTON ---
-    # Prevents incomplete data from polluting the database grid prematurely
     send_button = st.button("🚀 Send Profile to Matrix", type="primary", use_container_width=True)
     
     if send_button:
@@ -178,6 +178,7 @@ with col2:
             
             classification_target = st.radio("Classify Topology Coordinates By:", ["Birth State", "Assigned Gender", "Birth Year"], horizontal=True)
             
+            # 1. Base scatter plot layout
             fig = px.scatter(
                 df,
                 x="UMAP Axis 1",
@@ -185,14 +186,40 @@ with col2:
                 color=classification_target,
                 hover_name="Anonymized Label",
                 hover_data=["Age", "Birth State", "Assigned Gender"],
-                title=f"Live UMAP Projection Map (Clustered by {classification_target})",
                 template="plotly_white"
             )
-            fig.update_traces(marker=dict(size=14, opacity=0.8, line=dict(width=1, color="DarkSlateGrey")))
+            
+            # 2. --- DRAW CLOUD AROUND CLUSTERS (Density Contour Overlay) ---
+            # Generates mathematical boundaries enclosing point masses dynamically
+            fig_contour = px.density_contour(df, x="UMAP Axis 1", y="UMAP Axis 2")
+            for trace in fig_contour.data:
+                trace.update(
+                    line=dict(color="rgba(59, 130, 246, 0.35)", width=2, dash="dashdot"),
+                    contours=dict(coloring="none")
+                )
+                fig.add_trace(trace)
+                
+            fig.update_traces(marker=dict(size=14, opacity=0.9, line=dict(width=1, color="DarkSlateGrey")), selector=dict(type='scatter'))
+            fig.update_layout(title=f"Live Spatial Topology with Cluster Density Clouds (Grouped by {classification_target})")
             st.plotly_chart(fig, use_container_width=True)
             
+            # --- 🤖 AUTOMATED DATA INSIGHTS ENGINE (Auto-Commentary) ---
+            st.subheader("🤖 Automated Demographic Intelligence Report")
+            
+            top_state = df["Birth State"].value_counts().idxmax()
+            state_count = df["Birth State"].value_counts().max()
+            male_percentage = (df["Assigned Gender"] == "Male").sum() / total_records * 100
+            avg_classroom_age = df["Age"].mean()
+            
+            # Compile a dynamic narrative summary based on real-time matrix changes
+            st.markdown(f"""
+            * **Spatial Core Composition:** The cluster space currently identifies a high-density node centered around individuals born in **{top_state}** (accounting for {state_count} submitted profiles).
+            * **Geometric Gender Distribution:** The mathematical topology is split across a **{male_percentage:.1f}% Male** vector alignment. The spatial distances on the graph show how clearly UMAP separates these binary code values.
+            * **Generational Variance:** The average historical age vector of this room resolves to **{avg_classroom_age:.1f} years old**. Points tracking closely together along the vertical axis represent shared generation layers.
+            """)
+            
         except Exception as e:
-            st.info("Gathering structural point variations... Submit a few more distinct entries to settle spatial vectors.")
+            st.info("Gathering structural point variations... Submit a few more distinct entries to settle spatial vectors and build the cluster clouds.")
             
         st.subheader("📋 Current Registry Overview")
         st.dataframe(df[["Anonymized Label", "Birth Year", "Birth State", "Assigned Gender"]], use_container_width=True)
