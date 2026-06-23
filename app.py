@@ -7,9 +7,9 @@ import umap
 from st_keyup import st_keyup
 
 # Set page layout to wide for dashboard split look
-st.set_page_config(layout="wide", page_title="MyKad Continuous UMAP Engine")
+st.set_page_config(layout="wide", page_title="MyKad Controlled UMAP Engine")
 
-# Inject Custom CSS to make the live mask display bold and beautiful
+# Inject Custom CSS to style the input box and make the fill-in-the-blank mask giant
 st.markdown("""
     <style>
         div[data-baseweb="input"] input {
@@ -68,7 +68,6 @@ class CloudRegistryManager:
     
     def add_entry(self, raw_vector, yy, pb, g):
         rv_str = str(raw_vector).strip()
-        # Ensure identical values aren't double-saved during key holding
         if rv_str and not (self.df["Raw_Vector"] == rv_str).any():
             new_row = {"Raw_Vector": rv_str, "YY": str(yy), "PB": str(pb), "G": str(g)}
             self.df = pd.concat([self.df, pd.DataFrame([new_row])], ignore_index=True)
@@ -85,7 +84,7 @@ db = get_cloud_registry()
 # Layout Split: 1/3 Guided Input Column, 2/3 Live Visual Dashboard
 col1, col2 = st.columns([1, 2])
 
-# --- COLUMN 1: INSTANT TYPING PORTAL (NO ENTER KEY REQUIRED) ---
+# --- COLUMN 1: INSTANT TYPING PORTAL WITH EXPLICIT SEND BUTTON ---
 with col1:
     st.header("📥 Continuous Entry")
     
@@ -95,7 +94,7 @@ with col1:
     st.image(qr_api_url, caption="Scan with your phone to type live", width=180)
     st.markdown("---")
     
-    # FIX: Uses st_keyup to natively process letters live on every stroke
+    # Natively processes keystrokes live on every stroke
     live_input = st_keyup(
         label="Type continuous stream: YY then PB then G",
         value="",
@@ -119,17 +118,25 @@ with col1:
     current_mask_view = f"{disp_yy}####-{disp_pb}-###{disp_g}"
     st.markdown(f"<div class='giant-mask'>{current_mask_view}</div>", unsafe_allow_html=True)
     
-    if len(clean_digits) == 5:
-        db.add_entry(clean_digits, yy_part, pb_part, g_part)
-        st.success("🎯 Pattern linked successfully! Look at the projector screen.")
-    elif len(clean_digits) > 0:
-        st.info(f"Receiving live stream: {len(clean_digits)} / 5 digits entered.")
+    # --- THE SEND CONTROL BUTTON ---
+    # Prevents incomplete data from polluting the database grid prematurely
+    send_button = st.button("🚀 Send Profile to Matrix", type="primary", use_container_width=True)
+    
+    if send_button:
+        if len(clean_digits) == 5:
+            db.add_entry(clean_digits, yy_part, pb_part, g_part)
+            st.success("🎯 Pattern linked successfully! Check the main projector screen.")
+        else:
+            st.error(f"❌ Complete the pattern first! Missing digits: {5 - len(clean_digits)}/5 remaining.")
+            
+    if len(clean_digits) > 0 and len(clean_digits) < 5:
+        st.info(f"Typing progress: {len(clean_digits)} / 5 digits tracked.")
 
 # --- COLUMN 2: LIVE UMAP CLASSIFIER PLATFORM ---
 with col2:
     st.header("🖥️ Live UMAP Projection Center")
     
-    if st.button("🔄 Sync Classroom Network Matrix", type="primary", use_container_width=True):
+    if st.button("🔄 Sync Classroom Network Matrix", use_container_width=True):
         st.rerun()
         
     df = db.df.copy()
