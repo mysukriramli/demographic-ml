@@ -4,28 +4,21 @@ import numpy as np
 import plotly.express as px
 from sklearn.preprocessing import StandardScaler
 import umap
+import streamlit.components.v1 as components
 
 # Set page layout to wide for dashboard split look
-st.set_page_config(layout="wide", page_title="MyKad Masked UMAP Engine")
+st.set_page_config(layout="wide", page_title="MyKad Continuous UMAP Engine")
 
-# Inject Custom CSS to style the input box and make the fill-in-the-blank mask giant
+# Inject Custom CSS to make the interface clean and present the giant mask beautifully
 st.markdown("""
     <style>
-        div[data-baseweb="input"] input {
-            font-size: 32px !important;
-            height: 65px !important;
-            text-align: center !important;
-            font-family: 'Courier New', monospace !important;
-            font-weight: bold !important;
-            letter-spacing: 2px !important;
-        }
         .giant-mask {
-            font-size: 54px !important;
+            font-size: 56px !important;
             font-family: 'Courier New', monospace !important;
             font-weight: bold !important;
             color: #1E40AF !important;
             text-align: center !important;
-            letter-spacing: 6px !important;
+            letter-spacing: 8px !important;
             background-color: #F3F4F6 !important;
             padding: 20px !important;
             border-radius: 12px !important;
@@ -65,10 +58,12 @@ class CloudRegistryManager:
     def __init__(self):
         self.df = pd.DataFrame(columns=["Raw_Vector", "YY", "PB", "G"])
     
-    def add_entry(self, row):
-        # Bulletproof duplicate checking using string values
-        if not (self.df["Raw_Vector"] == str(row["Raw_Vector"])).any():
-            self.df = pd.concat([self.df, pd.DataFrame([row])], ignore_index=True)
+    def add_entry(self, raw_vector, yy, pb, g):
+        # Clean inputs to prevent type mismatch crashes
+        rv_str = str(raw_vector).strip()
+        if rv_str and not (self.df["Raw_Vector"] == rv_str).any():
+            new_row = {"Raw_Vector": rv_str, "YY": str(yy), "PB": str(pb), "G": str(g)}
+            self.df = pd.concat([self.df, pd.DataFrame([new_row])], ignore_index=True)
             
     def wipe_all(self):
         self.df = pd.DataFrame(columns=["Raw_Vector", "YY", "PB", "G"])
@@ -82,26 +77,53 @@ db = get_cloud_registry()
 # Layout Split: 1/3 Guided Input Column, 2/3 Live Visual Dashboard
 col1, col2 = st.columns([1, 2])
 
-# --- COLUMN 1: GUIDED LIVE MASK ENTRY PORTAL ---
+# --- COLUMN 1: INSTANT TYPING PORTAL (NO ENTER KEY REQUIRED) ---
 with col1:
     st.header("📥 Continuous Entry")
     
     st.markdown("### 📲 Scan to Join Live")
-    # Updated to your project's custom deployment link
     app_url = "https://demographic-ml-37tvhybmcrlgumshlapppp4o.streamlit.app/"
     qr_api_url = f"https://api.qrserver.com/v1/create-qr-code/?size=180x180&data={app_url}"
     st.image(qr_api_url, caption="Scan with your phone to type live", width=180)
     st.markdown("---")
     
-    # Clean and filter input characters live
-    initial_input = st.text_input(
-        label="Enter sequence: YY then PB then G (5 digits total)",
-        value="",
-        max_chars=5,
-        placeholder="YYPBG"
-    )
+    st.markdown("##### Type your 5 digits below:")
+
+    # JavaScript integration to catch every single keystroke live without hitting enter
+    custom_input_html = """
+    <div style="text-align: center;">
+        <input type="text" id="digits_input" maxlength="5" placeholder="YYPBG" 
+            style="font-size: 32px; width: 90%; height: 60px; text-align: center; font-family: monospace; font-weight: bold; border: 2px solid #3B82F6; border-radius: 8px;">
+    </div>
+    <script>
+        const inputField = document.getElementById('digits_input');
+        inputField.addEventListener('input', (e) => {
+            // Filter non-numeric characters instantly
+            inputField.value = inputField.value.replace(/[^0-9]/g, '');
+            
+            # Pushes values directly to Streamlit URL query parameters on the fly
+            const url = new URL(window.parent.location.href);
+            url.searchParams.set('live_stream', inputField.value);
+            window.parent.history.replaceState({}, '', url.href);
+            
+            // Auto-trigger Streamlit refresh if 5 digits are complete
+            if (inputField.value.length === 5 || inputField.value.length === 0) {
+                window.parent.location.reload();
+            }
+        });
+        
+        // Keep focus locked in the box for smooth continuous typing
+        window.addEventListener('load', () => { inputField.focus(); });
+    </script>
+    """
+    components.html(custom_input_html, height=85)
+
+    # Read the real-time background query string
+    query_params = st.query_params
+    live_digits = str(query_params.get("live_stream", "")).strip()
     
-    clean_digits = "".join([c for c in initial_input if c.isdigit()])
+    # Clean the string array safety layer
+    clean_digits = "".join([c for c in live_digits if c.isdigit()])[0:5]
     
     # --- LIVE FILL-IN-THE-BLANK MASK CONTROLLER ---
     yy_part = clean_digits[0:2]
@@ -109,25 +131,18 @@ with col1:
     g_part = clean_digits[4:5]
     
     disp_yy = yy_part + "Y" * (2 - len(yy_part))
-    disp_pb = pb_part + "PB"[(len(pb_part)):] if len(yy_part) == 2 else "PB"
+    disp_pb = pb_part + "PB"[len(pb_part):] if len(yy_part) == 2 else "PB"
     disp_g = g_part if len(clean_digits) == 5 else "G"
     
-    # Direct straight fill-in-the-blank view
+    # Present the clean fill-in-the-blank string representation
     current_mask_view = f"{disp_yy}####-{disp_pb}-###{disp_g}"
     st.markdown(f"<div class='giant-mask'>{current_mask_view}</div>", unsafe_allow_html=True)
     
-    # Auto-commit trigger immediately upon reaching 5 digits
     if len(clean_digits) == 5:
-        new_profile_row = {
-            "Raw_Vector": str(clean_digits),
-            "YY": str(yy_part),
-            "PB": str(pb_part),
-            "G": str(g_part)
-        }
-        db.add_entry(new_profile_row)
-        st.success("🎯 Pattern linked successfully!")
+        db.add_entry(clean_digits, yy_part, pb_part, g_part)
+        st.success("🎯 Vector linked to coordinate grid!")
     elif len(clean_digits) > 0:
-        st.info(f"Streaming data... {len(clean_digits)}/5 digits entered.")
+        st.info(f"Receiving live keystrokes: {len(clean_digits)}/5 digits parsed.")
 
 # --- COLUMN 2: LIVE UMAP CLASSIFIER PLATFORM ---
 with col2:
@@ -141,7 +156,7 @@ with col2:
     
     st.metric(label="Total Anonymous Profiles Submitted", value=total_records)
     
-    # UMAP pipeline executes safely as soon as 4 distinct student records are logged
+    # Run UMAP once a basic data cluster size is achieved
     if total_records >= 4:
         df["YY_int"] = df["YY"].astype(int)
         df["PB_int"] = df["PB"].astype(int)
@@ -151,13 +166,12 @@ with col2:
         df["Birth Year"] = df["YY_int"].apply(lambda x: 2000 + x if x <= 26 else 1900 + x)
         df["Age"] = 2026 - df["Birth Year"]
         
-        # SAFE LOOKUP: Using .get() fallback to prevent any potential KeyError crashes
+        # Safe fallback method dictionary extraction
         df["Birth State"] = df["PB"].apply(lambda x: pb_map.get(str(x), "International / Other"))
         df["Assigned Gender"] = df["G_int"].apply(lambda x: "Female" if x % 2 == 0 else "Male")
         
         df["Anonymized Label"] = df.index.map(lambda x: f"Identity_{x+1:02d}")
         
-        # Extract features array for spatial coordinate reduction
         processing_matrix = df[["Age", "PB_int", "G_int"]]
         
         scaler = StandardScaler()
@@ -203,4 +217,5 @@ st.markdown("<br><br><br><br><br>", unsafe_allow_html=True)
 with st.expander("·", expanded=False):
     if st.button("🗑️ Clear Live Database Cache"):
         db.wipe_all()
+        st.query_params.clear()
         st.rerun()
