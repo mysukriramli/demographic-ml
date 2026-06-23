@@ -8,38 +8,40 @@ import umap
 # Set page layout to wide for dashboard split look
 st.set_page_config(layout="wide", page_title="MyKad Masked UMAP Engine")
 
-# Inject Custom CSS to style the input box and the giant live tracking mask
+# Inject Custom CSS to style the input box and make the fill-in-the-blank mask giant
 st.markdown("""
     <style>
         div[data-baseweb="input"] input {
-            font-size: 28px !important;
-            height: 60px !important;
+            font-size: 32px !important;
+            height: 65px !important;
             text-align: center !important;
             font-family: 'Courier New', monospace !important;
             font-weight: bold !important;
+            letter-spacing: 2px !important;
         }
         .giant-mask {
-            font-size: 48px !important;
+            font-size: 54px !important;
             font-family: 'Courier New', monospace !important;
             font-weight: bold !important;
             color: #1E40AF !important;
             text-align: center !important;
-            letter-spacing: 4px !important;
+            letter-spacing: 6px !important;
             background-color: #F3F4F6 !important;
-            padding: 15px !important;
-            border-radius: 10px !important;
-            border: 2px dashed #3B82F6 !important;
-            margin-bottom: 20px !important;
+            padding: 20px !important;
+            border-radius: 12px !important;
+            border: 3px solid #3B82F6 !important;
+            margin-bottom: 25px !important;
         }
     </style>
 """, unsafe_allow_html=True)
 
 st.title("🚨 Anonymized Identity Demographics Classifier")
 st.markdown("""
-    **Classroom Context:** Students type only their **Birth Year (YY)**, **Birth State Code (PB)**, and **Gender Digit (G)** continuously as a 5-digit stream. The system automatically jumps over the private parameters using a secure mask!
+    **Classroom Context:** Students type only their Birth Year (YY), Birth State Code (PB), and Gender Digit (G) 
+    continuously as a 5-digit stream. The system automatically jumps over the private parameters using a secure mask!
 """)
 
-# --- Place of Birth (PB) Mapping Base ---
+# --- Safe Place of Birth (PB) Mapping Base ---
 pb_map = {
     "01": "Johor", "21": "Johor", "22": "Johor", "23": "Johor", "24": "Johor",
     "02": "Kedah", "25": "Kedah", "26": "Kedah", "27": "Kedah",
@@ -58,14 +60,14 @@ pb_map = {
     "15": "Labuan", "58": "Labuan", "16": "Putrajaya"
 }
 
-# --- GLOBAL SHARED DATABASE MANAGER (Starts completely empty and neutral) ---
+# --- GLOBAL SHARED DATABASE MANAGER ---
 class CloudRegistryManager:
     def __init__(self):
         self.df = pd.DataFrame(columns=["Raw_Vector", "YY", "PB", "G"])
     
     def add_entry(self, row):
-        # Prevent duplicate submissions from identical concurrent keystrokes
-        if not ((self.df["Raw_Vector"] == row["Raw_Vector"])).any():
+        # Bulletproof duplicate checking using string values
+        if not (self.df["Raw_Vector"] == str(row["Raw_Vector"])).any():
             self.df = pd.concat([self.df, pd.DataFrame([row])], ignore_index=True)
             
     def wipe_all(self):
@@ -85,51 +87,47 @@ with col1:
     st.header("📥 Continuous Entry")
     
     st.markdown("### 📲 Scan to Join Live")
-    # Your project's verified deployment endpoint link
+    # Updated to your project's custom deployment link
     app_url = "https://demographic-ml-37tvhybmcrlgumshlapppp4o.streamlit.app/"
     qr_api_url = f"https://api.qrserver.com/v1/create-qr-code/?size=180x180&data={app_url}"
     st.image(qr_api_url, caption="Scan with your phone to type live", width=180)
     st.markdown("---")
     
-    st.markdown("##### Type your 5 digits sequentially:")
-    
-    # Single text field capturing continuous keystrokes
-    user_code = st.text_input(
+    # Clean and filter input characters live
+    initial_input = st.text_input(
         label="Enter sequence: YY then PB then G (5 digits total)",
         value="",
         max_chars=5,
         placeholder="YYPBG"
     )
     
-    # Filter incoming characters live
-    clean_digits = "".join([c for c in user_code if c.isdigit()])
+    clean_digits = "".join([c for c in initial_input if c.isdigit()])
     
-    # --- DYNAMIC TEXT INTERPOLATION MASK ---
-    # Calculates placement steps automatically as the student types
+    # --- LIVE FILL-IN-THE-BLANK MASK CONTROLLER ---
     yy_part = clean_digits[0:2]
     pb_part = clean_digits[2:4]
     g_part = clean_digits[4:5]
     
-    disp_yy = yy_part + "_" * (2 - len(yy_part))
-    disp_pb = pb_part + "_" * (2 - len(pb_part)) if len(yy_part) == 2 else "__"
-    disp_g = g_part if len(clean_digits) == 5 else "_"
+    disp_yy = yy_part + "Y" * (2 - len(yy_part))
+    disp_pb = pb_part + "PB"[(len(pb_part)):] if len(yy_part) == 2 else "PB"
+    disp_g = g_part if len(clean_digits) == 5 else "G"
     
-    # Renders the giant visual guide requested by the user
+    # Direct straight fill-in-the-blank view
     current_mask_view = f"{disp_yy}####-{disp_pb}-###{disp_g}"
     st.markdown(f"<div class='giant-mask'>{current_mask_view}</div>", unsafe_allow_html=True)
     
-    # Auto-commit trigger immediately upon entering the final parameter digit
+    # Auto-commit trigger immediately upon reaching 5 digits
     if len(clean_digits) == 5:
         new_profile_row = {
-            "Raw_Vector": clean_digits,
-            "YY": yy_part,
-            "PB": pb_part,
-            "G": g_part
+            "Raw_Vector": str(clean_digits),
+            "YY": str(yy_part),
+            "PB": str(pb_part),
+            "G": str(g_part)
         }
         db.add_entry(new_profile_row)
-        st.success("🎯 Mask configuration committed anonymously!")
+        st.success("🎯 Pattern linked successfully!")
     elif len(clean_digits) > 0:
-        st.info(f"Typing stream active... Character count: {len(clean_digits)}/5 digits")
+        st.info(f"Streaming data... {len(clean_digits)}/5 digits entered.")
 
 # --- COLUMN 2: LIVE UMAP CLASSIFIER PLATFORM ---
 with col2:
@@ -145,7 +143,6 @@ with col2:
     
     # UMAP pipeline executes safely as soon as 4 distinct student records are logged
     if total_records >= 4:
-        # --- ANONYMOUS FEATURE ENGINEERING ---
         df["YY_int"] = df["YY"].astype(int)
         df["PB_int"] = df["PB"].astype(int)
         df["G_int"] = df["G"].astype(int)
@@ -154,11 +151,10 @@ with col2:
         df["Birth Year"] = df["YY_int"].apply(lambda x: 2000 + x if x <= 26 else 1900 + x)
         df["Age"] = 2026 - df["Birth Year"]
         
-        # Cross-reference parsed metrics to descriptive strings
-        df["Birth State"] = df["PB"].map(pb_map).fillna("International / Other")
+        # SAFE LOOKUP: Using .get() fallback to prevent any potential KeyError crashes
+        df["Birth State"] = df["PB"].apply(lambda x: pb_map.get(str(x), "International / Other"))
         df["Assigned Gender"] = df["G_int"].apply(lambda x: "Female" if x % 2 == 0 else "Male")
         
-        # Completely secure mask system to display data on screen anonymously
         df["Anonymized Label"] = df.index.map(lambda x: f"Identity_{x+1:02d}")
         
         # Extract features array for spatial coordinate reduction
@@ -167,7 +163,6 @@ with col2:
         scaler = StandardScaler()
         scaled_matrix = scaler.fit_transform(processing_matrix)
         
-        # Adjust neighbors mathematically based on current classroom sample size
         neighbors_calc = min(15, total_records - 1)
         if neighbors_calc < 2: 
             neighbors_calc = 2
@@ -179,7 +174,6 @@ with col2:
             df["UMAP Axis 1"] = embedding[:, 0]
             df["UMAP Axis 2"] = embedding[:, 1]
             
-            # Interactive Category Filter
             classification_target = st.radio("Classify Topology Coordinates By:", ["Birth State", "Assigned Gender", "Birth Year"], horizontal=True)
             
             fig = px.scatter(
@@ -195,10 +189,9 @@ with col2:
             fig.update_traces(marker=dict(size=14, opacity=0.8, line=dict(width=1, color="DarkSlateGrey")))
             st.plotly_chart(fig, use_container_width=True)
             
-        except Exception as error_log:
+        except Exception as e:
             st.info("Gathering structural point variations... Submit a few more distinct entries to settle spatial vectors.")
             
-        # Summary log output table
         st.subheader("📋 Current Registry Overview")
         st.dataframe(df[["Anonymized Label", "Birth Year", "Birth State", "Assigned Gender"]], use_container_width=True)
         
