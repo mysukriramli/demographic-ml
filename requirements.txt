@@ -4,3 +4,4 @@ numpy
 scikit-learn
 umap-learn
 plotly
+streamlit-keyup
