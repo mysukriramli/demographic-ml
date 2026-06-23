@@ -4,21 +4,29 @@ import numpy as np
 import plotly.express as px
 from sklearn.preprocessing import StandardScaler
 import umap
-import streamlit.components.v1 as components
+from st_keyup import st_keyup
 
 # Set page layout to wide for dashboard split look
 st.set_page_config(layout="wide", page_title="MyKad Continuous UMAP Engine")
 
-# Inject Custom CSS to make the interface clean and present the giant mask beautifully
+# Inject Custom CSS to make the live mask display bold and beautiful
 st.markdown("""
     <style>
+        div[data-baseweb="input"] input {
+            font-size: 32px !important;
+            height: 65px !important;
+            text-align: center !important;
+            font-family: 'Courier New', monospace !important;
+            font-weight: bold !important;
+            letter-spacing: 2px !important;
+        }
         .giant-mask {
-            font-size: 56px !important;
+            font-size: 54px !important;
             font-family: 'Courier New', monospace !important;
             font-weight: bold !important;
             color: #1E40AF !important;
             text-align: center !important;
-            letter-spacing: 8px !important;
+            letter-spacing: 6px !important;
             background-color: #F3F4F6 !important;
             padding: 20px !important;
             border-radius: 12px !important;
@@ -59,8 +67,8 @@ class CloudRegistryManager:
         self.df = pd.DataFrame(columns=["Raw_Vector", "YY", "PB", "G"])
     
     def add_entry(self, raw_vector, yy, pb, g):
-        # Clean inputs to prevent type mismatch crashes
         rv_str = str(raw_vector).strip()
+        # Ensure identical values aren't double-saved during key holding
         if rv_str and not (self.df["Raw_Vector"] == rv_str).any():
             new_row = {"Raw_Vector": rv_str, "YY": str(yy), "PB": str(pb), "G": str(g)}
             self.df = pd.concat([self.df, pd.DataFrame([new_row])], ignore_index=True)
@@ -87,62 +95,35 @@ with col1:
     st.image(qr_api_url, caption="Scan with your phone to type live", width=180)
     st.markdown("---")
     
-    st.markdown("##### Type your 5 digits below:")
-
-    # JavaScript integration to catch every single keystroke live without hitting enter
-    custom_input_html = """
-    <div style="text-align: center;">
-        <input type="text" id="digits_input" maxlength="5" placeholder="YYPBG" 
-            style="font-size: 32px; width: 90%; height: 60px; text-align: center; font-family: monospace; font-weight: bold; border: 2px solid #3B82F6; border-radius: 8px;">
-    </div>
-    <script>
-        const inputField = document.getElementById('digits_input');
-        inputField.addEventListener('input', (e) => {
-            // Filter non-numeric characters instantly
-            inputField.value = inputField.value.replace(/[^0-9]/g, '');
-            
-            # Pushes values directly to Streamlit URL query parameters on the fly
-            const url = new URL(window.parent.location.href);
-            url.searchParams.set('live_stream', inputField.value);
-            window.parent.history.replaceState({}, '', url.href);
-            
-            // Auto-trigger Streamlit refresh if 5 digits are complete
-            if (inputField.value.length === 5 || inputField.value.length === 0) {
-                window.parent.location.reload();
-            }
-        });
-        
-        // Keep focus locked in the box for smooth continuous typing
-        window.addEventListener('load', () => { inputField.focus(); });
-    </script>
-    """
-    components.html(custom_input_html, height=85)
-
-    # Read the real-time background query string
-    query_params = st.query_params
-    live_digits = str(query_params.get("live_stream", "")).strip()
+    # FIX: Uses st_keyup to natively process letters live on every stroke
+    live_input = st_keyup(
+        label="Type continuous stream: YY then PB then G",
+        value="",
+        max_chars=5,
+        key="live_key_stream"
+    )
     
-    # Clean the string array safety layer
-    clean_digits = "".join([c for c in live_digits if c.isdigit()])[0:5]
+    # Filter numbers out safely
+    clean_digits = "".join([c for c in live_input if c.isdigit()])[0:5]
     
     # --- LIVE FILL-IN-THE-BLANK MASK CONTROLLER ---
     yy_part = clean_digits[0:2]
     pb_part = clean_digits[2:4]
     g_part = clean_digits[4:5]
     
-    disp_yy = yy_part + "Y" * (2 - len(yy_part))
-    disp_pb = pb_part + "PB"[len(pb_part):] if len(yy_part) == 2 else "PB"
-    disp_g = g_part if len(clean_digits) == 5 else "G"
+    disp_yy = yy_part + "_" * (2 - len(yy_part))
+    disp_pb = pb_part + "_" * (2 - len(pb_part)) if len(yy_part) == 2 else "__"
+    disp_g = g_part if len(clean_digits) == 5 else "_"
     
-    # Present the clean fill-in-the-blank string representation
+    # Renders the precise fill-in-the-blank text mask format on screen
     current_mask_view = f"{disp_yy}####-{disp_pb}-###{disp_g}"
     st.markdown(f"<div class='giant-mask'>{current_mask_view}</div>", unsafe_allow_html=True)
     
     if len(clean_digits) == 5:
         db.add_entry(clean_digits, yy_part, pb_part, g_part)
-        st.success("🎯 Vector linked to coordinate grid!")
+        st.success("🎯 Pattern linked successfully! Look at the projector screen.")
     elif len(clean_digits) > 0:
-        st.info(f"Receiving live keystrokes: {len(clean_digits)}/5 digits parsed.")
+        st.info(f"Receiving live stream: {len(clean_digits)} / 5 digits entered.")
 
 # --- COLUMN 2: LIVE UMAP CLASSIFIER PLATFORM ---
 with col2:
@@ -166,7 +147,7 @@ with col2:
         df["Birth Year"] = df["YY_int"].apply(lambda x: 2000 + x if x <= 26 else 1900 + x)
         df["Age"] = 2026 - df["Birth Year"]
         
-        # Safe fallback method dictionary extraction
+        # Safe fallback method dictionary extraction to prevent any KeyError
         df["Birth State"] = df["PB"].apply(lambda x: pb_map.get(str(x), "International / Other"))
         df["Assigned Gender"] = df["G_int"].apply(lambda x: "Female" if x % 2 == 0 else "Male")
         
@@ -217,5 +198,4 @@ st.markdown("<br><br><br><br><br>", unsafe_allow_html=True)
 with st.expander("·", expanded=False):
     if st.button("🗑️ Clear Live Database Cache"):
         db.wipe_all()
-        st.query_params.clear()
         st.rerun()
