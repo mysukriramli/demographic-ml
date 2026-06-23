@@ -1,0 +1,6 @@
+streamlit
+pandas
+numpy
+scikit-learn
+umap-learn
+plotly
