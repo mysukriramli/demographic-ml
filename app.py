@@ -190,14 +190,14 @@ with col2:
         except Exception as e:
             st.info("Gathering structural point variations... Submit a few more distinct entries to settle spatial vectors.")
             
-        # --- NEW SECTION: AUTOMATED DEMOGRAPHIC COMMENTARY REPORT ---
+        # --- NEW SECTION: SIMPLIFIED DEMOGRAPHIC COMMENTARY REPORT ---
         st.markdown("---")
-        st.subheader("🤖 Automated Demographic Intelligence Report")
+        st.subheader("🤖 Simple AI Summary: What the Map Shows")
         
         # 1. Geographic Concentration Commentary
-        top_state = df["Birth State"].mode()[0]
-        state_counts = df["Birth State"].value_value_counts = df["Birth State"].value_counts()
-        top_state_pct = (state_counts.iloc[0] / total_records) * 100
+        top_state = df["Birth State"].mode()[0] if not df["Birth State"].empty else "Unknown"
+        state_counts = df["Birth State"].value_counts()
+        top_state_pct = (state_counts.iloc[0] / total_records) * 100 if total_records > 0 else 0
         
         # 2. Generational Commentary (Relative to 2026)
         gen_z_count = len(df[(df["Birth Year"] >= 1997) & (df["Birth Year"] <= 2009)])
@@ -208,16 +208,15 @@ with col2:
         male_count = len(df[df["Assigned Gender"] == "Male"])
         female_count = len(df[df["Assigned Gender"] == "Female"])
         
-        # Render dynamic analytical summary cards based on incoming matrix trends
         st.markdown(f"""
-        ### 📊 Spatial Clustering Analysis:
-        * **Geographic Hotspot:** The most heavily represented region in the current dataset is **{top_state}**, which accounts for **{top_state_pct:.1f}%** of all entries. On the UMAP chart, this forms a dense coordinate cluster due to shared geographic code values.
-        * **Generational Variance:** In our active 2026 data stream, the class matrix is structurally divided into **{gen_alpha_count}** Gen Alpha profiles, **{gen_z_count}** Gen Z profiles, and **{millennial_count}** Millennial profiles. UMAP utilizes these age vectors to spread data points smoothly along the age axis.
-        * **Gender Matrix Ratios:** The current room balance stands at **{male_count} Male entries** vs. **{female_count} Female entries**. When toggling the color map to 'Assigned Gender', you will notice a distinct, clean mathematical bisection on the chart because the final odd/even digits create a highly polarized spatial separation.
+        ### 📊 Grouping Patterns Explained:
+        * **🗺️ Where is everyone from?** Most people in this room were born in **{top_state}** ({top_state_pct:.1f}% of the class). On the map, these people crowd together in the same neighborhood because the AI notices their matching state codes!
+        * **⏳ Oldest to Youngest:** Right now in 2026, our group is made up of **{millennial_count}** Millennials, **{gen_z_count}** Gen Z, and **{gen_alpha_count}** Gen Alpha. The AI naturally stacks them in order based on their birth year.
+        * **👫 Boys vs. Girls:** We have **{male_count} Male(s)** and **{female_count} Female(s)**. If you switch the map color to 'Assigned Gender', the map splits cleanly down the middle. This happens because the AI instantly separates odd numbers (Boys) from even numbers (Girls)!
         """)
         
         if total_records >= 10:
-            st.success("💡 **Data Science Insight:** With over 10 profiles mapped, notice how UMAP's non-linear manifold math automatically groups people who share the exact same state and gender close together, while cleanly separating different age generations into distinct bands!")
+            st.success("💡 **Data Science Insight:** Notice how the AI puts people who share the exact same state and gender close together, while sorting different age groups into separate bands automatically!")
             
         # Summary log output table
         st.subheader("📋 Current Registry Overview")
